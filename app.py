@@ -1,51 +1,175 @@
 import streamlit as st
-from datetime import datetime
+import json
+import os
+from datetime import datetime, date
 
-# --- Configuração básica da página (título que aparece na aba do navegador) ---
-st.set_page_config(page_title="Minha Lista de Tarefas", page_icon="📝")
-
-# --- Título mostrado no topo da página ---
-st.title("📝 Minha Lista de Tarefas")
-
-# --- "Memória" do app ---
-# O Streamlit "esquece" tudo toda vez que a página recarrega.
-# Por isso usamos o st.session_state: é como uma caixinha onde guardamos
-# a lista de tarefas enquanto o app está aberto.
-if "tarefas" not in st.session_state:
-    st.session_state.tarefas = []  # começa vazia
-
-# --- Função para adicionar uma tarefa nova ---
-def adicionar_tarefa():
-    texto = st.session_state.nova_tarefa  # pega o que foi digitado no campo
-    if texto.strip() != "":  # só adiciona se não estiver vazio
-        data_criacao = datetime.now().strftime("%d/%m/%Y %H:%M")  # data e hora atuais, formatadas
-        st.session_state.tarefas.append({"texto": texto, "feita": False, "data": data_criacao})
-        st.session_state.nova_tarefa = ""  # limpa o campo depois de adicionar
-
-# --- Campo de texto + botão de adicionar ---
-st.text_input(
-    "Digite uma nova tarefa:",
-    key="nova_tarefa",
-    on_change=adicionar_tarefa  # chama a função quando o usuário aperta Enter
+# 1. Configuração da Página
+st.set_page_config(
+    page_title="Gerenciador de Tarefas Pro", 
+    page_icon="✅", 
+    layout="wide"
 )
 
-st.divider()
+ARQUIVO_DADOS = "tarefas.json"
 
-# --- Mostrando a lista de tarefas na tela ---
-if len(st.session_state.tarefas) == 0:
-    st.info("Nenhuma tarefa ainda. Adicione uma acima! 👆")
+# 2. Persistência de Dados (Funções para Salvar e Carregar)
+def carregar_tarefas():
+    if os.path.exists(ARQUIVO_DADOS):
+        try:
+            with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
+                tarefas = json.load(f)
+                # Converter datas salvas em string de volta para objeto date
+                for t in tarefas:
+                    if t.get("vencimento"):
+                        t["vencimento"] = datetime.strptime(t["vencimento"], "%Y-%m-%d").date()
+                return tarefas
+        except Exception:
+            return []
+    return []
+
+def salvar_tarefas(tarefas):
+    tarefas_para_salvar = []
+    for t in tarefas:
+        t_copy = t.copy()
+        if isinstance(t_copy.get("vencimento"), date):
+            t_copy["vencimento"] = t_copy["vencimento"].strftime("%Y-%m-%d")
+        tarefas_para_salvar.append(t_copy)
+    
+    with open(ARQUIVO_DADOS, "w", encoding="utf-8") as f:
+        json.dump(tarefas_para_salvar, f, ensure_ascii=False, indent=4)
+
+# 3. Inicialização da Memória da Sessão
+if "tarefas" not in st.session_state:
+    st.session_state.tarefas = carregar_tarefas()
+
+# --- BARRA LATERAL (Filtros e Ações) ---
+st.sidebar.header("🔍 Filtros & Opções")
+
+# Filtro por Busca
+busca = st.sidebar.text_input("Buscar tarefa...", placeholder="Digite palavras-chave")
+
+# Filtro por Categoria
+categorias = ["Todas", "Trabalho", "Estudos", "Pessoal", "Finanças", "Saúde", "Outros"]
+cat_filtrada = st.sidebar.selectbox("Filtrar por Categoria", categorias)
+
+# Filtro por Status
+status_filtro = st.sidebar.radio("Filtrar por Status", ["Todas", "Pendentes", "Concluídas"])
+
+st.sidebar.markdown("---")
+if st.sidebar.button("🧹 Limpar Todas as Tarefas", type="secondary"):
+    st.session_state.tarefas = []
+    salvar_tarefas([])
+    st.rerun()
+
+# --- CONTEÚDO PRINCIPAL ---
+st.title("✅ Gerenciador de Tarefas Pro")
+st.caption("Organize seus compromissos com prioridades, prazos e categorias.")
+
+# 4. Painel de Métricas e Progresso
+total = len(st.session_state.tarefas)
+concluidas = sum(1 for t in st.session_state.tarefas if t["concluida"])
+pendentes = total - concluidas
+progresso = (concluidas / total) if total > 0 else 0.0
+
+col_m1, col_m2, col_m3 = st.columns(3)
+col_m1.metric("Total de Tarefas", total)
+col_m2.metric("Pendentes", pendentes)
+col_m3.metric("Concluídas", concluidas)
+
+st.progress(progresso, text=f"Progresso de Conclusão: {int(progresso * 100)}%")
+st.markdown("---")
+
+# 5. Formulário para Adicionar Nova Tarefa
+with st.expander("➕ **Adicionar Nova Tarefa**", expanded=True):
+    with st.form(key="form_nova_tarefa", clear_on_submit=True):
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            texto = st.text_input("Descrição da Tarefa*", placeholder="Ex: Entregar trabalho acadêmico")
+        with col2:
+            categoria = st.selectbox("Categoria", ["Trabalho", "Estudos", "Pessoal", "Finanças", "Saúde", "Outros"])
+
+        col3, col4 = st.columns([1, 1])
+        with col3:
+            prioridade = st.select_slider("Prioridade", options=["Baixa", "Média", "Alta"], value="Média")
+        with col4:
+            vencimento = st.date_input("Data de Vencimento", value=date.today())
+
+        btn_salvar = st.form_submit_button("Salvar Tarefa")
+
+        if btn_salvar:
+            if texto.strip() == "":
+                st.error("Por favor, informe a descrição da tarefa!")
+            else:
+                nova = {
+                    "texto": texto,
+                    "categoria": categoria,
+                    "prioridade": prioridade,
+                    "vencimento": vencimento,
+                    "concluida": False
+                }
+                st.session_state.tarefas.append(nova)
+                salvar_tarefas(st.session_state.tarefas)
+                st.success("Tarefa adicionada com sucesso!")
+                st.rerun()
+
+# 6. Exibição das Tarefas
+st.subheader("📌 Minhas Tarefas")
+
+# Aplicação dos Filtros
+tarefas_exibicao = st.session_state.tarefas
+
+if status_filtro == "Pendentes":
+    tarefas_exibicao = [t for t in tarefas_exibicao if not t["concluida"]]
+elif status_filtro == "Concluídas":
+    tarefas_exibicao = [t for t in tarefas_exibicao if t["concluida"]]
+
+if cat_filtrada != "Todas":
+    tarefas_exibicao = [t for t in tarefas_exibicao if t.get("categoria") == cat_filtrada]
+
+if busca.strip():
+    tarefas_exibicao = [t for t in tarefas_exibicao if busca.lower() in t["texto"].lower()]
+
+# Mapeamento de Cores por Prioridade
+cores_prioridade = {
+    "Alta": "🔴 **[Alta]**",
+    "Média": "🟡 **[Média]**",
+    "Baixa": "🟢 **[Baixa]**"
+}
+
+if not tarefas_exibicao:
+    st.info("Nenhuma tarefa encontrada com os filtros selecionados.")
 else:
     for i, tarefa in enumerate(st.session_state.tarefas):
-        # cria uma checkbox para cada tarefa; quando marcada, riscamos o texto
-        col1, col2 = st.columns([3, 1])  # divide a linha em duas colunas: tarefa e data
-        with col1:
-            marcada = st.checkbox(tarefa["texto"], value=tarefa["feita"], key=f"tarefa_{i}")
-            st.session_state.tarefas[i]["feita"] = marcada
-        with col2:
-            st.caption(f"🕒 {tarefa['data']}")  # mostra a data pequena, ao lado
+        # Apenas exibe se a tarefa estiver no conjunto filtrado
+        if tarefa in tarefas_exibicao:
+            with st.container():
+                c_check, c_desc, c_meta, c_del = st.columns([0.05, 0.55, 0.3, 0.1])
 
-    # --- Contador simples de progresso ---
-    total = len(st.session_state.tarefas)
-    feitas = sum(1 for t in st.session_state.tarefas if t["feita"])
-    st.caption(f"{feitas} de {total} tarefas concluídas")
-    
+                # Checkbox de status
+                with c_check:
+                    status = st.checkbox("", value=tarefa["concluida"], key=f"chk_{i}")
+                    if status != tarefa["concluida"]:
+                        st.session_state.tarefas[i]["concluida"] = status
+                        salvar_tarefas(st.session_state.tarefas)
+                        st.rerun()
+
+                # Texto / Descrição
+                with c_desc:
+                    if tarefa["concluida"]:
+                        st.markdown(f"~~{tarefa['texto']}~~")
+                    else:
+                        st.write(f"**{tarefa['texto']}**")
+
+                # Metadados (Categoria, Prioridade, Data)
+                with c_meta:
+                    prio_tag = cores_prioridade.get(tarefa.get("prioridade", "Média"), "")
+                    data_str = tarefa["vencimento"].strftime("%d/%m/%Y") if isinstance(tarefa.get("vencimento"), date) else ""
+                    st.caption(f"📂 {tarefa.get('categoria', 'Geral')} | {prio_tag} | 📅 {data_str}")
+
+                # Botão Excluir
+                with c_del:
+                    if st.button("🗑️", key=f"del_{i}"):
+                        st.session_state.tarefas.pop(i)
+                        salvar_tarefas(st.session_state.tarefas)
+                        st.rerun()
+            st.divider()
