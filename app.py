@@ -13,9 +13,9 @@ st.set_page_config(
 ARQUIVO_TAREFAS = "tarefas.json"
 ARQUIVO_USUARIOS = "usuarios.json"
 
-# Usuário padrão para garantir que você nunca fique trancado fora do app
+# Credenciais Fixas (Sua garantia de nunca perder o acesso)
 USUARIO_PADRAO = "carlos zanela"
-SENHA_PADRAO = "123456"  # Altere para a senha que desejar antes de subir
+SENHA_PADRAO = "123456"  # Troque pela senha que preferir antes de colar
 
 # 2. Funções para Gerenciar Usuários
 def carregar_usuarios():
@@ -27,7 +27,6 @@ def carregar_usuarios():
         except Exception:
             usuarios = {}
             
-    # Garante que o usuário principal sempre exista mesmo se o JSON for apagado no deploy
     if USUARIO_PADRAO not in usuarios:
         usuarios[USUARIO_PADRAO] = SENHA_PADRAO
         salvar_usuarios(usuarios)
@@ -90,7 +89,7 @@ TAGS_PRIORIDADE = {
 if st.session_state.usuario_logado is None:
     st.title("🔒 Acesso ao Gerenciador de Tarefas")
     
-    tab_login, tab_cadastro, tab_recuperar = st.tabs(["🔑 Entrar", "📝 Criar Conta", "🛠️ Redefinir Senha"])
+    tab_login, tab_cadastro = st.tabs(["🔑 Entrar", "📝 Criar Conta"])
     
     with tab_login:
         with st.form("form_login"):
@@ -99,14 +98,13 @@ if st.session_state.usuario_logado is None:
             btn_entrar = st.form_submit_button("Entrar")
             
             if btn_entrar:
-                # Recarrega usuários para garantir dados atualizados
                 st.session_state.usuarios = carregar_usuarios()
                 if usuario in st.session_state.usuarios and st.session_state.usuarios[usuario] == senha:
                     st.session_state.usuario_logado = usuario
                     st.success("Login realizado com sucesso!")
                     st.rerun()
                 else:
-                    st.error("Usuário ou senha incorretos. (Dica: o nome de usuário não diferencia maiúsculas/minúsculas)")
+                    st.error("Usuário ou senha incorretos.")
 
     with tab_cadastro:
         with st.form("form_cadastro"):
@@ -118,29 +116,15 @@ if st.session_state.usuario_logado is None:
                 if not novo_usuario or not nova_senha:
                     st.error("Preencha todos os campos!")
                 elif novo_usuario in st.session_state.usuarios:
-                    st.error("Este usuário já existe. Use a aba 'Redefinir Senha' se esqueceu a sua.")
+                    st.error("Este usuário já existe.")
                 else:
                     st.session_state.usuarios[novo_usuario] = nova_senha
                     salvar_usuarios(st.session_state.usuarios)
                     st.success("Conta criada com sucesso! Faça login na aba 'Entrar'.")
 
-    with tab_recuperar:
-        with st.form("form_recuperar"):
-            usuario_rec = st.text_input("Seu Nome de Usuário").strip().lower()
-            senha_nova = st.text_input("Nova Senha", type="password")
-            btn_recuperar = st.form_submit_button("Atualizar Senha")
-
-            if btn_recuperar:
-                if usuario_rec in st.session_state.usuarios:
-                    st.session_state.usuarios[usuario_rec] = senha_nova
-                    salvar_usuarios(st.session_state.usuarios)
-                    st.success("Senha alterada com sucesso! Faça login na aba 'Entrar'.")
-                else:
-                    st.error("Usuário não encontrado.")
-
     st.stop()
 
-# --- ÁREA PRIVADA ---
+# --- ÁREA PRIVADA (APÓS LOGIN) ---
 user_atual = st.session_state.usuario_logado
 
 if user_atual not in st.session_state.todas_tarefas:
@@ -279,7 +263,6 @@ if prio_filtrada != "Todas":
 if busca.strip():
     tarefas_exibicao = [t for t in tarefas_exibicao if busca.lower() in t["texto"].lower()]
 
-# Ordenação automática por data de vencimento
 tarefas_exibicao = sorted(tarefas_exibicao, key=lambda x: x.get("vencimento", date.today()))
 
 if not tarefas_exibicao:
