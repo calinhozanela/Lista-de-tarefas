@@ -1,37 +1,10 @@
 import streamlit as st
 import json
 import os
-import base64
 from datetime import date
 
-# O set_page_config PRECISA ser o primeiro comando do Streamlit no arquivo
 st.set_page_config(page_title="Gerenciador de Tarefas", page_icon="✅", layout="wide")
 
-# --- FUNÇÃO PARA ADICIONAR LOGO/IMAGEM DE FUNDO ---
-def aplicar_imagem_fundo(caminho_imagem):
-    if os.path.exists(caminho_imagem):
-        with open(caminho_imagem, "rb") as f:
-            dados = f.read()
-        encoded = base64.b64encode(dados).decode()
-        
-        # CSS para colocar a imagem no fundo com leve transparência para leitura
-        css = f"""
-        <style>
-        .stApp {{
-            background-image: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), url("data:image/webp;base64,{encoded}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-
-# Aplica a imagem de fundo logo no início
-aplicar_imagem_fundo("logo.webp")
-
-# --- CONFIGURAÇÃO DE ARQUIVOS E CONSTANTES ---
 ARQUIVO_TAREFAS = "tarefas.json"
 ARQUIVO_USUARIOS = "usuarios.json"
 
@@ -69,6 +42,9 @@ if "usuario_logado" not in st.session_state:
 
 # --- TELA DE LOGIN ---
 if st.session_state.usuario_logado is None:
+    if os.path.exists("logo.webp"):
+        st.image("logo.webp", width=150)
+
     st.title("🔒 Login no Gerenciador de Tarefas")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
@@ -101,6 +77,10 @@ if user not in st.session_state.todas_tarefas:
     st.session_state.todas_tarefas[user] = []
 
 tarefas = st.session_state.todas_tarefas[user]
+
+# Exibe a logo no topo do menu lateral de forma elegante
+if os.path.exists("logo.webp"):
+    st.sidebar.image("logo.webp", use_container_width=True)
 
 st.sidebar.title(f"👤 Usuário: {user}")
 if st.sidebar.button("🚪 Logout"):
