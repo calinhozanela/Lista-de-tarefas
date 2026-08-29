@@ -42,6 +42,10 @@ if "usuario_logado" not in st.session_state:
 
 # --- LOGIN ---
 if st.session_state.usuario_logado is None:
+    # Exibe a logo centralizada/no topo da tela de login
+    if os.path.exists("logo.webp"):
+        st.image("logo.webp", width=180)
+
     st.title("🔒 Login no Gerenciador de Tarefas")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
@@ -68,6 +72,10 @@ if user not in st.session_state.todas_tarefas:
     st.session_state.todas_tarefas[user] = []
 
 tarefas = st.session_state.todas_tarefas[user]
+
+# --- LOGO NA BARRA LATERAL ---
+if os.path.exists("logo.webp"):
+    st.sidebar.image("logo.webp", use_container_width=True)
 
 st.sidebar.title(f"👤 Usuário: {user}")
 if st.sidebar.button("🚪 Logout"):
@@ -124,4 +132,6 @@ with st.expander("📊 Estatísticas (carregamento sob demanda)"):
     st.write(f"Total de tarefas: {len(tarefas)}")
     concluidas = sum(1 for t in tarefas if t["concluida"])
     st.write(f"Tarefas concluídas: {concluidas}")
-    st.image("logo.webp", caption="Imagem otimizada em WebP", use_column_width=True)
+    # Mantido o seu st.image dentro das estatísticas
+    if os.path.exists("logo.webp"):
+        st.image("logo.webp", caption="Imagem otimizada em WebP", use_container_width=True)
